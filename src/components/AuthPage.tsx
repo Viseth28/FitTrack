@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Mail, Lock, ArrowRight, User, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, User, Loader2, AlertCircle, AtSign } from 'lucide-react';
 import { supabase } from './supabase';
 
 interface AuthPageProps {
@@ -9,11 +9,18 @@ interface AuthPageProps {
 
 export function LoginPage({ onLogin }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    username: '',
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleAuth = async () => {
     try {
@@ -21,22 +28,40 @@ export function LoginPage({ onLogin }: AuthPageProps) {
       setLoading(true);
 
       if (isLogin) {
+        let emailForAuth = form.email;
+        const isEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+
+        if (!isEmailFormat) {
+          // Assume it's a username, get the email via RPC
+          const { data, error: rpcError } = await supabase.rpc('get_email_by_username', {
+            p_username: form.email,
+          });
+
+          if (rpcError || !data) {
+            throw new Error('Invalid credentials');
+          }
+          emailForAuth = data;
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
+          email: emailForAuth,
+          password: form.password,
         });
         if (error) throw error;
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName } }
+          email: form.email,
+          password: form.password,
+          options: { data: { full_name: form.fullName, username: form.username } },
         });
         if (error) throw error;
       }
       onLogin();
     } catch (err: any) {
-      setError(err.message);
+      const friendlyMessage = err.message.includes('Invalid login credentials') || err.message.includes('Invalid credentials')
+        ? 'Invalid email/username or password.'
+        : err.message;
+      setError(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -71,37 +96,50 @@ export function LoginPage({ onLogin }: AuthPageProps) {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="text"
+                name="fullName"
                 placeholder="Full Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={form.fullName}
+                onChange={handleInputChange}
                 className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white focus:border-lime-400 focus:ring-0 transition-all outline-none"
               />
             </div>
           )}
-          
+          {!isLogin && (
+            <div className="relative">
+              <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                name="username"
+                placeholder="Username"
+                value={form.username}
+                onChange={handleInputChange}
+                className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white focus:border-lime-400 focus:ring-0 transition-all outline-none"
+              />
+            </div>
+          )}
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             <input
               type="email"
-              placeholder="Email Address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
+              placeholder={isLogin ? "Email or Username" : "Email Address"}
+              value={form.email}
+              onChange={handleInputChange}
               className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white focus:border-lime-400 focus:ring-0 transition-all outline-none"
             />
           </div>
-
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             <input
               type="password"
+              name="password"
               placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={form.password}
+              onChange={handleInputChange}
               className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white focus:border-lime-400 focus:ring-0 transition-all outline-none"
             />
           </div>
         </div>
-
         <button
           onClick={handleAuth}
           disabled={loading}
@@ -110,7 +148,6 @@ export function LoginPage({ onLogin }: AuthPageProps) {
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
           {!loading && <ArrowRight className="w-5 h-5" />}
         </button>
-
         <div className="text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
