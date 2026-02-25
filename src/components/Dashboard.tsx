@@ -155,11 +155,12 @@ function isToday(date: Date) {
     date.getFullYear() === today.getFullYear();
 }
 
-export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect }: { 
+export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, username }: { 
   stats: any; 
   recentExercises: Exercise[];
   selectedDate: string;
   onDateSelect: (date: string) => void;
+  username?: string;
 }) {
   const [activeCategory, setActiveCategory] = React.useState('Warm Up');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -219,7 +220,7 @@ export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect }
               <img src="https://picsum.photos/seed/user/200/200" alt="User" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-white text-lg font-bold">Hello Emma 👋</h1>
+              <h1 className="text-white text-lg font-bold">Hello {username || 'User'} 👋</h1>
               <p className="text-gray-400 text-xs">Get ready</p>
             </div>
           </div>
