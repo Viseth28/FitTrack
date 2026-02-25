@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Home, Dumbbell, BarChart2, Utensils, User, PlayCircle, Plus, ChevronRight } from 'lucide-react';
 import { useExercises } from './hooks/useExercises';
@@ -8,11 +8,10 @@ import { Dashboard } from './components/Dashboard';
 import { WorkoutSelector } from './components/WorkoutSelector';
 import { LoginPage } from './components/AuthPage';
 import { cn } from './lib/utils';
-import { supabase } from './lib/supabase';
 
 export default function App() {
-  const { exercises, addExercise, deleteExercise, refresh } = useExercises();
-  const [session, setSession] = useState<any>(null);
+  const { exercises, addExercise, deleteExercise } = useExercises();
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<'home' | 'workout' | 'stats' | 'meals' | 'profile'>('home');
   
   // Workout Tab State
@@ -28,25 +27,6 @@ export default function App() {
   });
 
   const [selectedDate, setSelectedDate] = React.useState(new Date().toLocaleDateString('en-CA'));
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) refresh();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
 
   // Stats Calculation
   const stats = React.useMemo(() => {
@@ -64,8 +44,8 @@ export default function App() {
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-gray-100 flex justify-center">
       <div className="w-full max-w-md bg-[#0a0a0a] h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         
-        {!session ? (
-          <LoginPage onLogin={() => {}} />
+        {!isLoggedIn ? (
+          <LoginPage onLogin={() => setIsLoggedIn(true)} />
         ) : (
           <>
             {/* Scrollable Content Area */}
@@ -136,23 +116,23 @@ export default function App() {
               </motion.div>
             )}
 
-                {activeTab === 'profile' && (
-                  <div className="flex flex-col items-center justify-center h-full space-y-6">
-                    <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center text-gray-500 border border-white/5">
-                      <User size={48} />
-                    </div>
-                    <div className="text-center">
-                      <h3 className="text-xl font-bold text-white">User Profile</h3>
-                      <p className="text-gray-500 text-sm">{session.user.email}</p>
-                    </div>
-                    <button
-                      onClick={handleLogout}
-                      className="px-8 py-3 bg-red-500/10 text-red-500 rounded-2xl font-bold border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
-                    >
-                      Log Out
-                    </button>
-                  </div>
-                )}
+            {activeTab === 'profile' && (
+              <div className="flex flex-col items-center justify-center h-full space-y-6">
+                <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center text-gray-500 border border-white/5">
+                  <User size={48} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-white">User Profile</h3>
+                  <p className="text-gray-500 text-sm">visethkako@gmail.com</p>
+                </div>
+                <button
+                  onClick={() => setIsLoggedIn(false)}
+                  className="px-8 py-3 bg-red-500/10 text-red-500 rounded-2xl font-bold border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
+                >
+                  Log Out
+                </button>
+              </div>
+            )}
 
             {['stats', 'meals'].includes(activeTab) && (
               <div className="flex items-center justify-center h-full text-gray-500">
