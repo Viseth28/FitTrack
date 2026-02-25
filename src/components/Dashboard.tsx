@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Bell, Flame, Trophy, Play, Footprints, Timer, Dumbbell, Heart, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Exercise, Notification } from '../types';
 import { NotificationModal } from './NotificationModal';
+import { supabase } from './supabase';
 
 function CalendarStrip({ selectedDate, onSelect }: { selectedDate: string; onSelect: (date: string) => void }) {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -164,6 +165,25 @@ export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, 
 }) {
   const [activeCategory, setActiveCategory] = React.useState('Warm Up');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+
+  useEffect(() => {
+    if (username) return;
+
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, username')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) setDisplayName(data.full_name || data.username || '');
+      }
+    };
+    fetchProfile();
+  }, [username]);
 
   const notifications = useMemo(() => {
     const list: Notification[] = [];
@@ -220,7 +240,7 @@ export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, 
               <img src="https://picsum.photos/seed/user/200/200" alt="User" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-white text-lg font-bold">Hello {username || 'User'} 👋</h1>
+              <h1 className="text-white text-lg font-bold">Hello {username || displayName || 'User'} 👋</h1>
               <p className="text-gray-400 text-xs">Get ready</p>
             </div>
           </div>
