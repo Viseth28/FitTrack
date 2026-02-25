@@ -28,13 +28,23 @@ export function LoginPage({ onLogin }: AuthPageProps) {
       setLoading(true);
 
       if (isLogin) {
-        let emailForAuth = form.email;
-        const isEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+        if (!form.email.trim() || !form.password.trim()) {
+          throw new Error('Please enter your email/username and password.');
+        }
+      } else {
+        if (!form.email.trim() || !form.password.trim() || !form.fullName.trim() || !form.username.trim()) {
+          throw new Error('Please fill in all fields.');
+        }
+      }
+
+      if (isLogin) {
+        let emailForAuth = form.email.trim();
+        const isEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
 
         if (!isEmailFormat) {
           // Assume it's a username, get the email via RPC
           const { data, error: rpcError } = await supabase.rpc('get_email_by_username', {
-            p_username: form.email,
+            p_username: form.email.trim(),
           });
 
           if (rpcError || !data) {
