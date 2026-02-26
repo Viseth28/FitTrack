@@ -9,7 +9,7 @@ import { WorkoutSelector } from './components/WorkoutSelector';
 import { LoginPage } from './components/AuthPage';
 import { ProfilePage } from './components/ProfilePage';
 import { cn } from './lib/utils';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { useProfile } from './hooks/useProfile';
 
@@ -38,9 +38,20 @@ export default function App() {
   const [selectedDate, setSelectedDate] = React.useState(new Date().toLocaleDateString('en-CA'));
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error('Error getting session:', error);
+      }
+      setUser(data?.session?.user ?? null);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Unexpected error getting session:', err);
       setLoading(false);
     });
 
@@ -64,6 +75,32 @@ export default function App() {
       distance: dayExercises.reduce((acc, curr) => acc + (curr.distance || 0), 0),
     };
   }, [exercises, selectedDate]);
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-4">
+          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white">Configuration Required</h1>
+          <p className="text-gray-400">
+            The application is missing the required Supabase configuration.
+          </p>
+          <div className="bg-zinc-900 p-4 rounded-lg text-left text-sm font-mono text-gray-300 overflow-x-auto">
+            <p className="mb-2 text-gray-500">Please set the following environment variables in your Vercel project settings:</p>
+            <div className="space-y-1">
+              <div>VITE_SUPABASE_URL</div>
+              <div>VITE_SUPABASE_ANON_KEY</div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-500">
+            After adding these variables, redeploy your application.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
