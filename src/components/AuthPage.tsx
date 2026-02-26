@@ -47,7 +47,7 @@ export function LoginPage({ onLogin }: AuthPageProps) {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -61,7 +61,14 @@ export function LoginPage({ onLogin }: AuthPageProps) {
         },
       });
       if (error) throw error;
-      alert('Check your email for the confirmation link!');
+      
+      // If session exists, user is logged in automatically (email confirmation disabled)
+      if (data.session) {
+        onLogin();
+      } else {
+        // Otherwise, email confirmation is required
+        alert('Check your email for the confirmation link!');
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
