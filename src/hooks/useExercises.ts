@@ -6,42 +6,40 @@ export function useExercises() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    fetchExercises();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchExercises();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const fetchExercises = async () => {
     try {
-      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setExercises([]);
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
-        .eq('user_id', user.id)
         .order('timestamp', { ascending: false });
 
       if (error) throw error;
       setExercises(data || []);
-    } catch (e) {
-      console.error('Failed to fetch exercises', e);
+    } catch (error) {
+      console.error('Error fetching exercises:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchExercises();
-
-    // Set up real-time subscription
-    const subscription = supabase
-      .channel('exercises_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exercises' }, () => {
-        fetchExercises();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, []);
 
   const addExercise = async (exercise: Omit<Exercise, 'id' | 'timestamp'>) => {
     try {
@@ -54,13 +52,17 @@ export function useExercises() {
         timestamp: Date.now(),
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('exercises')
-        .insert([newExercise]);
+        .insert([newExercise])
+        .select()
+        .single();
 
       if (error) throw error;
-    } catch (e) {
-      console.error('Failed to add exercise', e);
+      setExercises([data, ...exercises]);
+    } catch (error) {
+      console.error('Error adding exercise:', error);
+      alert('Failed to save exercise. Please try again.');
     }
   };
 
@@ -72,8 +74,10 @@ export function useExercises() {
         .eq('id', id);
 
       if (error) throw error;
-    } catch (e) {
-      console.error('Failed to delete exercise', e);
+      setExercises(exercises.filter((ex) => ex.id !== id));
+    } catch (error) {
+      console.error('Error deleting exercise:', error);
+      alert('Failed to delete exercise.');
     }
   };
 
@@ -89,7 +93,8 @@ export function useExercises() {
     return {
       calories: todayExercises.reduce((acc, curr) => acc + (curr.calories || 0), 0),
       duration: todayExercises.reduce((acc, curr) => acc + (curr.duration || 0), 0),
-      count: todayExercises.length
+      count: todayExercises.length,
+      distance: todayExercises.reduce((acc, curr) => acc + (curr.distance || 0), 0),
     };
   };
 
@@ -99,7 +104,6 @@ export function useExercises() {
     addExercise,
     deleteExercise,
     getTodayExercises,
-    getStats,
-    refresh: fetchExercises
+    getStats
   };
 }
