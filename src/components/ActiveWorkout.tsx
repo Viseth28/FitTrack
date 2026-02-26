@@ -7,6 +7,7 @@ import { ExerciseType, EXERCISE_TYPES } from '../types';
 interface ActiveWorkoutProps {
   onClose: () => void;
   initialType?: ExerciseType;
+  initialSubtype?: string;
   initialGoal?: number;
   initialName?: string;
   voiceSettings?: {
@@ -17,6 +18,7 @@ interface ActiveWorkoutProps {
   onSave: (data: {
     name: string;
     type: ExerciseType;
+    subtype?: string;
     duration: number; // minutes
     distance: number; // meters
     calories: number;
@@ -28,6 +30,7 @@ export default function ActiveWorkout({
   onClose, 
   onSave, 
   initialType = 'cardio', 
+  initialSubtype,
   initialGoal = 0, 
   initialName = '',
   voiceSettings = { enabled: true, gender: 'female', frequency: 5 }
@@ -202,6 +205,7 @@ export default function ActiveWorkout({
     onSave({
       name: customName || `${type.charAt(0).toUpperCase() + type.slice(1)} Session`,
       type,
+      subtype: initialSubtype,
       duration: Math.ceil(elapsedTime / 60),
       distance,
       calories: estimatedCalories > 0 ? estimatedCalories : Math.ceil(elapsedTime / 60 * 5),

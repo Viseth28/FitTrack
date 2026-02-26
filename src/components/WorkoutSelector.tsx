@@ -4,6 +4,7 @@ import { Hexagon, Play, Music, ChevronRight, Activity, PersonStanding, Target } 
 import { cn } from '../lib/utils';
 import { WorkoutSettings } from './WorkoutSettings';
 import { GoalSelector } from './GoalSelector';
+import { Exercise } from '../types';
 
 const WORKOUT_MODES = [
   { id: 'running', label: 'Outdoor Running', defaultGoal: 5.60 },
@@ -13,10 +14,11 @@ const WORKOUT_MODES = [
 ];
 
 interface WorkoutSelectorProps {
+  exercises: Exercise[];
   onStart: (mode: string, goal: number, label: string, settings?: { enabled: boolean, gender: 'male' | 'female', frequency: number }) => void;
 }
 
-export function WorkoutSelector({ onStart }: WorkoutSelectorProps) {
+export function WorkoutSelector({ exercises, onStart }: WorkoutSelectorProps) {
   const [selectedMode, setSelectedMode] = useState(WORKOUT_MODES[0]);
   const [showSettings, setShowSettings] = useState(false);
   const [showGoalSelector, setShowGoalSelector] = useState(false);
@@ -30,13 +32,31 @@ export function WorkoutSelector({ onStart }: WorkoutSelectorProps) {
     hiking: 8.00,
   });
 
-  // Mock total distance data for display only
-  const totalDistances: Record<string, number> = {
-    running: 124.5,
-    cycling: 342.8,
-    walking: 45.2,
-    hiking: 89.4
-  };
+  // Calculate total distance for each mode from real data
+  const totalDistances = React.useMemo(() => {
+    const totals: Record<string, number> = {
+      running: 0,
+      cycling: 0,
+      walking: 0,
+      hiking: 0
+    };
+
+    exercises.forEach(ex => {
+      // Check subtype first, then fallback to name matching for backward compatibility
+      if (ex.subtype && totals[ex.subtype] !== undefined) {
+        totals[ex.subtype] += (ex.distance || 0) / 1000; // convert meters to km
+      } else {
+        // Fallback: check if name contains the mode
+        const lowerName = ex.name.toLowerCase();
+        if (lowerName.includes('run')) totals.running += (ex.distance || 0) / 1000;
+        else if (lowerName.includes('cycl') || lowerName.includes('bike')) totals.cycling += (ex.distance || 0) / 1000;
+        else if (lowerName.includes('walk')) totals.walking += (ex.distance || 0) / 1000;
+        else if (lowerName.includes('hik')) totals.hiking += (ex.distance || 0) / 1000;
+      }
+    });
+
+    return totals;
+  }, [exercises]);
 
   const currentGoal = goals[selectedMode.id];
   const currentTotalDistance = totalDistances[selectedMode.id] || 0;

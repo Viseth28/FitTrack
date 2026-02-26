@@ -4,6 +4,7 @@ export interface Exercise {
   id: string;
   name: string;
   type: ExerciseType;
+  subtype?: string; // e.g., 'running', 'cycling'
   duration: number; // in minutes
   calories: number; // estimated
   distance?: number; // in meters

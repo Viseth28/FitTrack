@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Bell, Flame, Trophy, Play, Footprints, Timer, Dumbbell, Heart, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Exercise, Notification } from '../types';
 import { NotificationModal } from './NotificationModal';
-import { supabase } from './supabase';
+import { Profile } from '../hooks/useProfile';
 
 function CalendarStrip({ selectedDate, onSelect }: { selectedDate: string; onSelect: (date: string) => void }) {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -156,34 +156,15 @@ function isToday(date: Date) {
     date.getFullYear() === today.getFullYear();
 }
 
-export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, username }: { 
+export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, profile }: { 
   stats: any; 
   recentExercises: Exercise[];
   selectedDate: string;
   onDateSelect: (date: string) => void;
-  username?: string;
+  profile: Profile | null;
 }) {
   const [activeCategory, setActiveCategory] = React.useState('Warm Up');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [displayName, setDisplayName] = useState('');
-
-  useEffect(() => {
-    if (username) return;
-
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name, username')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) setDisplayName(data.full_name || data.username || '');
-      }
-    };
-    fetchProfile();
-  }, [username]);
 
   const notifications = useMemo(() => {
     const list: Notification[] = [];
@@ -230,6 +211,17 @@ export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, 
 
   const hasUnread = notifications.some(n => !n.read);
 
+  // Get display name (first name only if full name exists)
+  const displayName = useMemo(() => {
+    if (profile?.full_name) {
+      return profile.full_name.split(' ')[0];
+    }
+    if (profile?.username) {
+      return profile.username;
+    }
+    return 'User';
+  }, [profile]);
+
   return (
     <div className="pb-32">
       {/* Header */}
@@ -237,10 +229,16 @@ export function Dashboard({ stats, recentExercises, selectedDate, onDateSelect, 
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gray-700 overflow-hidden border-2 border-lime-400">
-              <img src="https://picsum.photos/seed/user/200/200" alt="User" className="w-full h-full object-cover" />
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="User" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-gray-500">
+                  <span className="text-xl font-bold">{displayName[0]}</span>
+                </div>
+              )}
             </div>
             <div>
-              <h1 className="text-white text-lg font-bold">Hello {username || displayName || 'User'} 👋</h1>
+              <h1 className="text-white text-lg font-bold">Hello {displayName} 👋</h1>
               <p className="text-gray-400 text-xs">Get ready</p>
             </div>
           </div>

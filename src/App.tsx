@@ -1,23 +1,32 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Dumbbell, BarChart2, Utensils, User, PlayCircle, Plus, ChevronRight } from 'lucide-react';
+import { Home, Dumbbell, BarChart2, Utensils, User as UserIcon, PlayCircle, Plus, ChevronRight } from 'lucide-react';
 import { useExercises } from './hooks/useExercises';
 import { EXERCISE_TYPES, ExerciseType } from './types';
 import ActiveWorkout from './components/ActiveWorkout';
 import { Dashboard } from './components/Dashboard';
 import { WorkoutSelector } from './components/WorkoutSelector';
 import { LoginPage } from './components/AuthPage';
+import { ProfilePage } from './components/ProfilePage';
 import { cn } from './lib/utils';
+import { supabase } from './lib/supabase';
+import { User } from '@supabase/supabase-js';
+import { useProfile } from './hooks/useProfile';
 
 export default function App() {
   const { exercises, addExercise, deleteExercise } = useExercises();
-  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<'home' | 'workout' | 'stats' | 'meals' | 'profile'>('home');
   
+  // Fetch profile
+  const { profile } = useProfile(user);
+
   // Workout Tab State
   const [showAddModal, setShowAddModal] = React.useState(false);
   const [showTracking, setShowTracking] = React.useState(false);
   const [initialWorkoutType, setInitialWorkoutType] = React.useState<any>('cardio');
+  const [initialSubtype, setInitialSubtype] = React.useState<string | undefined>(undefined);
   const [initialGoal, setInitialGoal] = React.useState<number>(0);
   const [initialWorkoutName, setInitialWorkoutName] = React.useState<string>('');
   const [voiceSettings, setVoiceSettings] = React.useState({
@@ -27,6 +36,22 @@ export default function App() {
   });
 
   const [selectedDate, setSelectedDate] = React.useState(new Date().toLocaleDateString('en-CA'));
+
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Stats Calculation
   const stats = React.useMemo(() => {
@@ -40,12 +65,20 @@ export default function App() {
     };
   }, [exercises, selectedDate]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-lime-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-gray-100 flex justify-center">
       <div className="w-full max-w-md bg-[#0a0a0a] h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         
-        {!isLoggedIn ? (
-          <LoginPage onLogin={() => setIsLoggedIn(true)} />
+        {!user ? (
+          <LoginPage onLogin={() => {}} />
         ) : (
           <>
             {/* Scrollable Content Area */}
@@ -64,6 +97,7 @@ export default function App() {
                   recentExercises={exercises.filter(e => e.date === selectedDate)} 
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
+                  profile={profile}
                 />
               </motion.div>
             )}
@@ -80,7 +114,9 @@ export default function App() {
                   <h2 className="text-2xl font-bold text-white">Workouts</h2>
                 </div>
                 
-                <WorkoutSelector onStart={(mode, goal, label, settings) => {
+                <WorkoutSelector 
+                  exercises={exercises}
+                  onStart={(mode, goal, label, settings) => {
                   // Map mode string to ExerciseType
                   const typeMap: Record<string, ExerciseType> = {
                     running: 'cardio',
@@ -89,6 +125,7 @@ export default function App() {
                     hiking: 'cardio'
                   };
                   setInitialWorkoutType(typeMap[mode] || 'cardio');
+                  setInitialSubtype(mode);
                   setInitialGoal(goal);
                   setInitialWorkoutName(label);
                   if (settings) setVoiceSettings(settings);
@@ -117,21 +154,10 @@ export default function App() {
             )}
 
             {activeTab === 'profile' && (
-              <div className="flex flex-col items-center justify-center h-full space-y-6">
-                <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center text-gray-500 border border-white/5">
-                  <User size={48} />
-                </div>
-                <div className="text-center">
-                  <h3 className="text-xl font-bold text-white">User Profile</h3>
-                  <p className="text-gray-500 text-sm">visethkako@gmail.com</p>
-                </div>
-                <button
-                  onClick={() => setIsLoggedIn(false)}
-                  className="px-8 py-3 bg-red-500/10 text-red-500 rounded-2xl font-bold border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
-                >
-                  Log Out
-                </button>
-              </div>
+              <ProfilePage 
+                user={user} 
+                onLogout={() => supabase.auth.signOut()} 
+              />
             )}
 
             {['stats', 'meals'].includes(activeTab) && (
@@ -177,7 +203,7 @@ export default function App() {
           <NavButton 
             active={activeTab === 'profile'} 
             onClick={() => setActiveTab('profile')} 
-            icon={<User />} 
+            icon={<UserIcon />} 
             label="Profile" 
           />
         </nav>
@@ -196,6 +222,7 @@ export default function App() {
         {showTracking && (
           <ActiveWorkout
             initialType={initialWorkoutType}
+            initialSubtype={initialSubtype}
             initialGoal={initialGoal}
             initialName={initialWorkoutName}
             voiceSettings={voiceSettings}
@@ -204,6 +231,7 @@ export default function App() {
               addExercise({
                 name: data.name,
                 type: data.type,
+                subtype: data.subtype,
                 duration: data.duration,
                 calories: data.calories,
                 distance: data.distance,

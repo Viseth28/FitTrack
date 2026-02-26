@@ -1,38 +1,80 @@
 import { useState, useEffect } from 'react';
 import { Exercise } from '../types';
-
-const STORAGE_KEY = 'fittrack_data';
+import { supabase } from '../lib/supabase';
 
 export function useExercises() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchExercises = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('timestamp', { ascending: false });
+
+      if (error) throw error;
+      setExercises(data || []);
+    } catch (e) {
+      console.error('Failed to fetch exercises', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setExercises(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse exercises', e);
-      }
-    }
+    fetchExercises();
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('exercises_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exercises' }, () => {
+        fetchExercises();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
-  const saveExercises = (newExercises: Exercise[]) => {
-    setExercises(newExercises);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newExercises));
+  const addExercise = async (exercise: Omit<Exercise, 'id' | 'timestamp'>) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const newExercise = {
+        ...exercise,
+        user_id: user.id,
+        timestamp: Date.now(),
+      };
+
+      const { error } = await supabase
+        .from('exercises')
+        .insert([newExercise]);
+
+      if (error) throw error;
+    } catch (e) {
+      console.error('Failed to add exercise', e);
+    }
   };
 
-  const addExercise = (exercise: Omit<Exercise, 'id' | 'timestamp'>) => {
-    const newExercise: Exercise = {
-      ...exercise,
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
-    };
-    saveExercises([newExercise, ...exercises]);
-  };
+  const deleteExercise = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('id', id);
 
-  const deleteExercise = (id: string) => {
-    saveExercises(exercises.filter((ex) => ex.id !== id));
+      if (error) throw error;
+    } catch (e) {
+      console.error('Failed to delete exercise', e);
+    }
   };
 
   const getTodayExercises = () => {
@@ -53,9 +95,11 @@ export function useExercises() {
 
   return {
     exercises,
+    loading,
     addExercise,
     deleteExercise,
     getTodayExercises,
-    getStats
+    getStats,
+    refresh: fetchExercises
   };
 }
