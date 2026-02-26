@@ -1,7 +1,0 @@
-{
-  "name": "Fit Daily",
-  "description": "A mobile-first daily exercise tracking application.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}
