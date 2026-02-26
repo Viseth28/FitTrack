@@ -70,7 +70,11 @@ export function LoginPage({ onLogin }: AuthPageProps) {
         alert('Check your email for the confirmation link!');
       }
     } catch (error: any) {
-      setError(error.message);
+      if (error.message?.includes('already registered')) {
+        setError('Account already exists. Please sign in instead.');
+      } else {
+        setError(error.message);
+      }
     } finally {
       setLoading(false);
     }
